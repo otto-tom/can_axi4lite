@@ -1,0 +1,37 @@
+--- hw_srcs/original/can_fifo.v	2005-03-10 10:25:48.000000000 +0200
++++ hw_srcs/patched/can_fifo.v	2018-10-31 14:50:43.571343662 +0200
+@@ -179,7 +179,7 @@
+ input         rst;
+ input         wr;
+ input   [7:0] data_in;
+-input   [5:0] addr;
++input   [6:0] addr;
+ input         reset_mode;
+ input         release_buffer;
+ input         extended_mode;
+@@ -221,6 +221,7 @@
+ reg     [5:0] rd_pointer;
+ reg     [5:0] wr_pointer;
+ reg     [5:0] read_address;
++reg     [6:0] addr_aligned;
+ reg     [5:0] wr_info_pointer;
+ reg     [5:0] rd_info_pointer;
+ reg           wr_q;
+@@ -362,9 +363,15 @@
+ always @ (extended_mode or rd_pointer or addr)
+ begin
+   if (extended_mode)      // extended mode
+-    read_address = rd_pointer + (addr - 6'd16);
++  begin
++    addr_aligned = addr>>2;
++    read_address = rd_pointer + (addr_aligned[5:0] - 6'd16);
++  end
+   else                    // normal mode
+-    read_address = rd_pointer + (addr - 6'd20);
++  begin
++    addr_aligned = addr>>2;
++    read_address = rd_pointer + (addr_aligned[5:0]- 6'd20);
++  end
+ end
+ 
+ 

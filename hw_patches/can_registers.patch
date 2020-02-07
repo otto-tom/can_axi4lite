@@ -1,0 +1,385 @@
+--- hw_srcs/original/can_registers.v	2005-03-18 17:04:05.000000000 +0200
++++ hw_srcs/patched/can_registers.v	2018-10-31 01:29:11.636969447 +0200
+@@ -131,7 +131,7 @@
+ //
+ // Revision 1.10  2003/01/31 01:13:38  mohor
+ // backup.
+-//
++//  
+ // Revision 1.9  2003/01/15 13:16:48  mohor
+ // When a frame with "remote request" is received, no data is stored
+ // to fifo, just the frame information (identifier, ...). Data length
+@@ -163,7 +163,21 @@
+ // Initial
+ //
+ //
+-//
++
++// Code Revision 2018/07/31 otto
++// -removed reset mode as prequisity to write
++//  filter and code reg0.
++// -added filter mode which controls
++//  the access to filter's code and mask registers
++//  and instead of reset mode.
++// -remove read_irq_reg
++// -add the irq_reg register.
++// -add irq_clear_reg to prevent faulty 
++//  interrupt in case of receicing interrupt and 
++//  reading irq_read_reg before buffer_release
++// -export more registers for reading
++// -separate we_command -> we_command_tx - we_command_rx
++// -add support to write in mask1 code1 when in standard mode
+ 
+ // synopsys translate_off
+ `include "timescale.v"
+@@ -286,9 +300,6 @@
+   tx_data_11,
+   tx_data_12
+   /* End: Tx data registers */
+-  
+-  
+-
+ 
+ );
+ 
+@@ -438,51 +449,64 @@
+ wire          transmit_irq_en;
+ wire          receive_irq_en;
+ 
+-wire    [7:0] irq_reg;
++reg     [7:0] irq_reg;
+ wire          irq;
+ 
+ wire we_mode                  = cs & we & (addr == 8'd0);
+-wire we_command               = cs & we & (addr == 8'd1);
+-wire we_bus_timing_0          = cs & we & (addr == 8'd6) & reset_mode;
+-wire we_bus_timing_1          = cs & we & (addr == 8'd7) & reset_mode;
+-wire we_clock_divider_low     = cs & we & (addr == 8'd31);
++wire we_command_tx            = cs & we & (addr == 8'd4);
++wire we_command_rx            = cs & we & (addr == 8'd8);
++wire we_filter                = cs & we & (addr == 8'd12);
++wire we_bus_timing_0          = cs & we & (addr == 8'd24) & reset_mode;
++wire we_bus_timing_1          = cs & we & (addr == 8'd28) & reset_mode;
++wire we_clock_divider_low     = cs & we & (addr == 8'd124);
+ wire we_clock_divider_hi      = we_clock_divider_low & reset_mode;
+ 
+ wire read = cs & (~we);
+-wire read_irq_reg = read & (addr == 8'd3);
+-assign read_arbitration_lost_capture_reg = read & extended_mode & (addr == 8'd11);
+-assign read_error_code_capture_reg = read & extended_mode & (addr == 8'd12);
++wire irq_clear_reg = read & (addr == 8'd4);
++assign read_arbitration_lost_capture_reg = read & extended_mode & (addr == 8'd44);
++assign read_error_code_capture_reg = read & extended_mode & (addr == 8'd48);
+ 
+ /* This section is for BASIC and EXTENDED mode */
+-wire we_acceptance_code_0       = cs & we &   reset_mode  & ((~extended_mode) & (addr == 8'd4)  | extended_mode & (addr == 8'd16));
+-wire we_acceptance_mask_0       = cs & we &   reset_mode  & ((~extended_mode) & (addr == 8'd5)  | extended_mode & (addr == 8'd20));
+-wire we_tx_data_0               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd10) | extended_mode & (addr == 8'd16)) & transmit_buffer_status;
+-wire we_tx_data_1               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd11) | extended_mode & (addr == 8'd17)) & transmit_buffer_status;
+-wire we_tx_data_2               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd12) | extended_mode & (addr == 8'd18)) & transmit_buffer_status;
+-wire we_tx_data_3               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd13) | extended_mode & (addr == 8'd19)) & transmit_buffer_status;
+-wire we_tx_data_4               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd14) | extended_mode & (addr == 8'd20)) & transmit_buffer_status;
+-wire we_tx_data_5               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd15) | extended_mode & (addr == 8'd21)) & transmit_buffer_status;
+-wire we_tx_data_6               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd16) | extended_mode & (addr == 8'd22)) & transmit_buffer_status;
+-wire we_tx_data_7               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd17) | extended_mode & (addr == 8'd23)) & transmit_buffer_status;
+-wire we_tx_data_8               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd18) | extended_mode & (addr == 8'd24)) & transmit_buffer_status;
+-wire we_tx_data_9               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd19) | extended_mode & (addr == 8'd25)) & transmit_buffer_status;
+-wire we_tx_data_10              = cs & we & (~reset_mode) & (                                     extended_mode & (addr == 8'd26)) & transmit_buffer_status;
+-wire we_tx_data_11              = cs & we & (~reset_mode) & (                                     extended_mode & (addr == 8'd27)) & transmit_buffer_status;
+-wire we_tx_data_12              = cs & we & (~reset_mode) & (                                     extended_mode & (addr == 8'd28)) & transmit_buffer_status;
++wire   filter_mode;
++//wire we_acceptance_code_0       = cs & we &   reset_mode  & ((~extended_mode) & (addr == 8'd4)  | extended_mode & (addr == 8'd16));
++wire we_acceptance_code_0       = cs & we & ((~extended_mode) & (addr == 8'd16)  | extended_mode & filter_mode    & (addr == 8'd64));
++//wire we_acceptance_mask_0       = cs & we &   reset_mode  & ((~extended_mode) & (addr == 8'd5)  | extended_mode & (addr == 8'd20));
++wire we_acceptance_mask_0       = cs & we & ((~extended_mode) & (addr == 8'd20)  | extended_mode & filter_mode    & (addr == 8'd80));
++wire we_tx_data_0               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd40) | extended_mode & (addr == 8'd64)) & transmit_buffer_status;
++wire we_tx_data_1               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd44) | extended_mode & (addr == 8'd68)) & transmit_buffer_status;
++wire we_tx_data_2               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd48) | extended_mode & (addr == 8'd72)) & transmit_buffer_status;
++wire we_tx_data_3               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd52) | extended_mode & (addr == 8'd76)) & transmit_buffer_status;
++wire we_tx_data_4               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd56) | extended_mode & (addr == 8'd80)) & transmit_buffer_status;
++wire we_tx_data_5               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd60) | extended_mode & (addr == 8'd84)) & transmit_buffer_status;
++wire we_tx_data_6               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd64) | extended_mode & (addr == 8'd88)) & transmit_buffer_status;
++wire we_tx_data_7               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd68) | extended_mode & (addr == 8'd92)) & transmit_buffer_status;
++wire we_tx_data_8               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd72) | extended_mode & (addr == 8'd96)) & transmit_buffer_status;
++wire we_tx_data_9               = cs & we & (~reset_mode) & ((~extended_mode) & (addr == 8'd76) | extended_mode & (addr == 8'd100)) & transmit_buffer_status;
++wire we_tx_data_10              = cs & we & (~reset_mode) & (                                     extended_mode & (addr == 8'd104)) & transmit_buffer_status;
++wire we_tx_data_11              = cs & we & (~reset_mode) & (                                     extended_mode & (addr == 8'd108)) & transmit_buffer_status;
++wire we_tx_data_12              = cs & we & (~reset_mode) & (                                     extended_mode & (addr == 8'd112)) & transmit_buffer_status;
+ /* End: This section is for BASIC and EXTENDED mode */
+ 
+ 
+ /* This section is for EXTENDED mode */
+-wire   we_interrupt_enable      = cs & we & (addr == 8'd4)  & extended_mode;
+-wire   we_error_warning_limit   = cs & we & (addr == 8'd13) & reset_mode & extended_mode;
+-assign we_rx_err_cnt            = cs & we & (addr == 8'd14) & reset_mode & extended_mode;
+-assign we_tx_err_cnt            = cs & we & (addr == 8'd15) & reset_mode & extended_mode;
++wire   we_interrupt_enable      = cs & we & (addr == 8'd16)  & extended_mode;
++wire   we_error_warning_limit   = cs & we & (addr == 8'd52) & reset_mode & extended_mode;
++assign we_rx_err_cnt            = cs & we & (addr == 8'd56) & reset_mode & extended_mode;
++assign we_tx_err_cnt            = cs & we & (addr == 8'd60) & reset_mode & extended_mode;
++/*
+ wire   we_acceptance_code_1     = cs & we & (addr == 8'd17) & reset_mode & extended_mode;
+ wire   we_acceptance_code_2     = cs & we & (addr == 8'd18) & reset_mode & extended_mode;
+ wire   we_acceptance_code_3     = cs & we & (addr == 8'd19) & reset_mode & extended_mode;
+ wire   we_acceptance_mask_1     = cs & we & (addr == 8'd21) & reset_mode & extended_mode;
+ wire   we_acceptance_mask_2     = cs & we & (addr == 8'd22) & reset_mode & extended_mode;
+ wire   we_acceptance_mask_3     = cs & we & (addr == 8'd23) & reset_mode & extended_mode;
++*/
++wire   we_acceptance_code_1     = cs & we & (addr == 8'd68) & filter_mode;
++wire   we_acceptance_code_2     = cs & we & (addr == 8'd72) & filter_mode    & extended_mode; 
++wire   we_acceptance_code_3     = cs & we & (addr == 8'd76) & filter_mode    & extended_mode;
++wire   we_acceptance_mask_1     = cs & we & (addr == 8'd84) & filter_mode;
++wire   we_acceptance_mask_2     = cs & we & (addr == 8'd88) & filter_mode    & extended_mode;
++wire   we_acceptance_mask_3     = cs & we & (addr == 8'd92) & filter_mode    & extended_mode;
+ /* End: This section is for EXTENDED mode */
+ 
+ 
+@@ -497,8 +521,6 @@
+   node_error_passive_q      <=#Tp node_error_passive;
+ end
+ 
+-
+-
+ /* Mode register */
+ wire   [0:0] mode;
+ wire   [4:1] mode_basic;
+@@ -517,6 +539,14 @@
+   .rst_sync(set_reset_mode)
+ );
+ 
++can_register_asyn #(1, 1'h0) FILTER_REG0
++( .data_in(data_in[0]),
++  .data_out(filter_mode),
++  .we(we_filter),
++  .clk(clk),
++  .rst(rst)
++);
++
+ can_register_asyn #(4, 0) MODE_REG_BASIC
+ ( .data_in(data_in[4:1]),
+   .data_out(mode_basic[4:1]),
+@@ -550,7 +580,7 @@
+ can_register_asyn_syn #(1, 1'h0) COMMAND_REG0
+ ( .data_in(data_in[0]),
+   .data_out(command[0]),
+-  .we(we_command),
++  .we(we_command_tx),
+   .clk(clk),
+   .rst(rst),
+   .rst_sync(command[0] & sample_point | reset_mode)
+@@ -559,7 +589,7 @@
+ can_register_asyn_syn #(1, 1'h0) COMMAND_REG1
+ ( .data_in(data_in[1]),
+   .data_out(command[1]),
+-  .we(we_command),
++  .we(we_command_tx),
+   .clk(clk),
+   .rst(rst),
+   .rst_sync(sample_point & (tx_request | (abort_tx & ~transmitting)) | reset_mode)
+@@ -568,7 +598,7 @@
+ can_register_asyn_syn #(2, 2'h0) COMMAND_REG
+ ( .data_in(data_in[3:2]),
+   .data_out(command[3:2]),
+-  .we(we_command),
++  .we(we_command_rx),
+   .clk(clk),
+   .rst(rst),
+   .rst_sync(|command[3:2] | reset_mode)
+@@ -577,7 +607,7 @@
+ can_register_asyn_syn #(1, 1'h0) COMMAND_REG4
+ ( .data_in(data_in[4]),
+   .data_out(command[4]),
+-  .we(we_command),
++  .we(we_command_tx),
+   .clk(clk),
+   .rst(rst),
+   .rst_sync(command[4] & sample_point | reset_mode)
+@@ -1087,56 +1117,58 @@
+            reset_mode or tx_data_0 or tx_data_1 or tx_data_2 or tx_data_3 or tx_data_4 or 
+            tx_data_5 or tx_data_6 or tx_data_7 or tx_data_8 or tx_data_9 or status or 
+            error_warning_limit or rx_err_cnt or tx_err_cnt or irq_en_ext or irq_reg or mode_ext or
+-           arbitration_lost_capture or rx_message_counter or mode_basic or error_capture_code
++           arbitration_lost_capture or rx_message_counter or mode_basic or error_capture_code or overrun
+          )
+ begin
+-  case({extended_mode, addr[4:0]})  /* synthesis parallel_case */ 
+-    {1'h1, 5'd00} :  data_out = {4'b0000, mode_ext[3:1], mode[0]};      // extended mode
+-    {1'h1, 5'd01} :  data_out = 8'h0;                                   // extended mode
+-    {1'h1, 5'd02} :  data_out = status;                                 // extended mode
+-    {1'h1, 5'd03} :  data_out = irq_reg;                                // extended mode
+-    {1'h1, 5'd04} :  data_out = irq_en_ext;                             // extended mode
+-    {1'h1, 5'd06} :  data_out = bus_timing_0;                           // extended mode
+-    {1'h1, 5'd07} :  data_out = bus_timing_1;                           // extended mode
+-    {1'h1, 5'd11} :  data_out = {3'h0, arbitration_lost_capture[4:0]};  // extended mode
+-    {1'h1, 5'd12} :  data_out = error_capture_code;                     // extended mode
+-    {1'h1, 5'd13} :  data_out = error_warning_limit;                    // extended mode
+-    {1'h1, 5'd14} :  data_out = rx_err_cnt;                             // extended mode
+-    {1'h1, 5'd15} :  data_out = tx_err_cnt;                             // extended mode
+-    {1'h1, 5'd16} :  data_out = acceptance_code_0;                      // extended mode
+-    {1'h1, 5'd17} :  data_out = acceptance_code_1;                      // extended mode
+-    {1'h1, 5'd18} :  data_out = acceptance_code_2;                      // extended mode
+-    {1'h1, 5'd19} :  data_out = acceptance_code_3;                      // extended mode
+-    {1'h1, 5'd20} :  data_out = acceptance_mask_0;                      // extended mode
+-    {1'h1, 5'd21} :  data_out = acceptance_mask_1;                      // extended mode
+-    {1'h1, 5'd22} :  data_out = acceptance_mask_2;                      // extended mode
+-    {1'h1, 5'd23} :  data_out = acceptance_mask_3;                      // extended mode
+-    {1'h1, 5'd24} :  data_out = 8'h0;                                   // extended mode
+-    {1'h1, 5'd25} :  data_out = 8'h0;                                   // extended mode
+-    {1'h1, 5'd26} :  data_out = 8'h0;                                   // extended mode
+-    {1'h1, 5'd27} :  data_out = 8'h0;                                   // extended mode
+-    {1'h1, 5'd28} :  data_out = 8'h0;                                   // extended mode
+-    {1'h1, 5'd29} :  data_out = {1'b0, rx_message_counter};             // extended mode
+-    {1'h1, 5'd31} :  data_out = clock_divider;                          // extended mode
+-    {1'h0, 5'd00} :  data_out = {3'b001, mode_basic[4:1], mode[0]};     // basic mode
+-    {1'h0, 5'd01} :  data_out = 8'hff;                                  // basic mode
+-    {1'h0, 5'd02} :  data_out = status;                                 // basic mode
+-    {1'h0, 5'd03} :  data_out = {4'he, irq_reg[3:0]};                   // basic mode
+-    {1'h0, 5'd04} :  data_out = reset_mode? acceptance_code_0 : 8'hff;  // basic mode
+-    {1'h0, 5'd05} :  data_out = reset_mode? acceptance_mask_0 : 8'hff;  // basic mode
+-    {1'h0, 5'd06} :  data_out = reset_mode? bus_timing_0 : 8'hff;       // basic mode
+-    {1'h0, 5'd07} :  data_out = reset_mode? bus_timing_1 : 8'hff;       // basic mode
+-    {1'h0, 5'd10} :  data_out = reset_mode? 8'hff : tx_data_0;          // basic mode
+-    {1'h0, 5'd11} :  data_out = reset_mode? 8'hff : tx_data_1;          // basic mode
+-    {1'h0, 5'd12} :  data_out = reset_mode? 8'hff : tx_data_2;          // basic mode
+-    {1'h0, 5'd13} :  data_out = reset_mode? 8'hff : tx_data_3;          // basic mode
+-    {1'h0, 5'd14} :  data_out = reset_mode? 8'hff : tx_data_4;          // basic mode
+-    {1'h0, 5'd15} :  data_out = reset_mode? 8'hff : tx_data_5;          // basic mode
+-    {1'h0, 5'd16} :  data_out = reset_mode? 8'hff : tx_data_6;          // basic mode
+-    {1'h0, 5'd17} :  data_out = reset_mode? 8'hff : tx_data_7;          // basic mode
+-    {1'h0, 5'd18} :  data_out = reset_mode? 8'hff : tx_data_8;          // basic mode
+-    {1'h0, 5'd19} :  data_out = reset_mode? 8'hff : tx_data_9;          // basic mode
+-    {1'h0, 5'd31} :  data_out = clock_divider;                          // basic mode
++  case({extended_mode, addr[6:0]})  /* synthesis parallel_case */ 
++    {1'h1, 7'd00} :  data_out = {4'b0000, mode_ext[3:1], mode[0]};      // extended mode
++    {1'h1, 7'd04} :  data_out = 8'h0;  /*reserved for irq_clear_reg*/   // extended mode
++    {1'h1, 7'd08} :  data_out = status;                                 // extended mode
++    {1'h1, 7'd12} :  data_out = irq_reg;                                // extended mode
++    {1'h1, 7'd16} :  data_out = irq_en_ext;                             // extended mode
++    {1'h1, 7'd24} :  data_out = bus_timing_0;                           // extended mode
++    {1'h1, 7'd28} :  data_out = bus_timing_1;                           // extended mode
++    {1'h1, 7'd44} :  data_out = {3'h0, arbitration_lost_capture[4:0]};  // extended mode
++    {1'h1, 7'd48} :  data_out = error_capture_code;                     // extended mode
++    {1'h1, 7'd52} :  data_out = error_warning_limit;                    // extended mode
++    {1'h1, 7'd56} :  data_out = rx_err_cnt;                             // extended mode
++    {1'h1, 7'd60} :  data_out = tx_err_cnt;                             // extended mode
++    {1'h1, 7'd64} :  data_out = acceptance_code_0;                      // extended mode
++    {1'h1, 7'd68} :  data_out = acceptance_code_1;                      // extended mode
++    {1'h1, 7'd72} :  data_out = acceptance_code_2;                      // extended mode
++    {1'h1, 7'd76} :  data_out = acceptance_code_3;                      // extended mode
++    {1'h1, 7'd80} :  data_out = acceptance_mask_0;                      // extended mode
++    {1'h1, 7'd84} :  data_out = acceptance_mask_1;                      // extended mode
++    {1'h1, 7'd88} :  data_out = acceptance_mask_2;                      // extended mode
++    {1'h1, 7'd92} :  data_out = acceptance_mask_3;                      // extended mode
++    {1'h1, 7'd96} :  data_out = 8'h0;                                   // extended mode
++    {1'h1, 7'd100} :  data_out = 8'h0;                                   // extended mode
++    {1'h1, 7'd104} :  data_out = 8'h0;                                   // extended mode
++    {1'h1, 7'd108} :  data_out = 8'h0;                                   // extended mode
++    {1'h1, 7'd112} :  data_out = 8'h0;                                   // extended mode
++    {1'h1, 7'd116} :  data_out = {1'b0, rx_message_counter};             // extended mode
++    {1'h1, 7'd124} :  data_out = clock_divider;                          // extended mode
++    {1'h0, 7'd00} :  data_out = {3'b001, mode_basic[4:1], mode[0]};     // basic mode
++    {1'h0, 7'd04} :  data_out = 8'hff;                                  // basic mode
++    {1'h0, 7'd08} :  data_out = status;                                 // basic mode
++    {1'h0, 7'd12} :  data_out = {4'he, irq_reg[3:0]};                   // basic mode
++    {1'h0, 7'd16} :  data_out = reset_mode? acceptance_code_0 : 8'hff;  // basic mode
++    {1'h0, 7'd20} :  data_out = reset_mode? acceptance_mask_0 : 8'hff;  // basic mode
++    {1'h0, 7'd24} :  data_out = reset_mode? bus_timing_0 : 8'hff;       // basic mode
++    {1'h0, 7'd28} :  data_out = reset_mode? bus_timing_1 : 8'hff;       // basic mode
++    {1'h0, 7'd32} :  data_out = {1'b0, rx_message_counter};             // basic mode
++    {1'h0, 7'd36} :  data_out = {7'b0, overrun};                        // basic mode
++    {1'h0, 7'd40} :  data_out = reset_mode? 8'hff : tx_data_0;          // basic mode
++    {1'h0, 7'd44} :  data_out = reset_mode? 8'hff : tx_data_1;          // basic mode
++    {1'h0, 7'd48} :  data_out = reset_mode? 8'hff : tx_data_2;          // basic mode
++    {1'h0, 7'd52} :  data_out = reset_mode? 8'hff : tx_data_3;          // basic mode
++    {1'h0, 7'd56} :  data_out = reset_mode? 8'hff : tx_data_4;          // basic mode
++    {1'h0, 7'd60} :  data_out = reset_mode? 8'hff : tx_data_5;          // basic mode
++    {1'h0, 7'd64} :  data_out = reset_mode? 8'hff : tx_data_6;          // basic mode
++    {1'h0, 7'd68} :  data_out = reset_mode? 8'hff : tx_data_7;          // basic mode
++    {1'h0, 7'd72} :  data_out = reset_mode? 8'hff : tx_data_8;          // basic mode
++    {1'h0, 7'd76} :  data_out = reset_mode? 8'hff : tx_data_9;          // basic mode
++    {1'h0, 7'd124} :  data_out = clock_divider;                          // basic mode
+     default :  data_out = 8'h0;                                   // the rest is read as 0
+   endcase
+ end
+@@ -1156,7 +1188,7 @@
+     data_overrun_irq <= 1'b0;
+   else if (overrun & (~overrun_q) & data_overrun_irq_en)
+     data_overrun_irq <=#Tp 1'b1;
+-  else if (reset_mode || read_irq_reg)
++  else if (reset_mode || irq_clear_reg)
+     data_overrun_irq <=#Tp 1'b0;
+ end
+ 
+@@ -1166,7 +1198,7 @@
+ begin
+   if (rst)
+     transmit_irq <= 1'b0;
+-  else if (reset_mode || read_irq_reg)
++  else if (reset_mode || irq_clear_reg)
+     transmit_irq <=#Tp 1'b0;
+   else if (transmit_buffer_status & (~transmit_buffer_status_q) & transmit_irq_en)
+     transmit_irq <=#Tp 1'b1;
+@@ -1192,7 +1224,7 @@
+     error_irq <= 1'b0;
+   else if (((error_status ^ error_status_q) | (node_bus_off ^ node_bus_off_q)) & error_warning_irq_en)
+     error_irq <=#Tp 1'b1;
+-  else if (read_irq_reg)
++  else if (irq_clear_reg)
+     error_irq <=#Tp 1'b0;
+ end
+ 
+@@ -1204,7 +1236,7 @@
+     bus_error_irq <= 1'b0;
+   else if (set_bus_error_irq & bus_error_irq_en)
+     bus_error_irq <=#Tp 1'b1;
+-  else if (reset_mode || read_irq_reg)
++  else if (reset_mode || irq_clear_reg)
+     bus_error_irq <=#Tp 1'b0;
+ end
+ 
+@@ -1216,7 +1248,7 @@
+     arbitration_lost_irq <= 1'b0;
+   else if (set_arbitration_lost_irq & arbitration_lost_irq_en)
+     arbitration_lost_irq <=#Tp 1'b1;
+-  else if (reset_mode || read_irq_reg)
++  else if (reset_mode || irq_clear_reg)
+     arbitration_lost_irq <=#Tp 1'b0;
+ end
+ 
+@@ -1229,22 +1261,27 @@
+     error_passive_irq <= 1'b0;
+   else if ((node_error_passive & (~node_error_passive_q) | (~node_error_passive) & node_error_passive_q & node_error_active) & error_passive_irq_en)
+     error_passive_irq <=#Tp 1'b1;
+-  else if (reset_mode || read_irq_reg)
++  else if (reset_mode || irq_clear_reg)
+     error_passive_irq <=#Tp 1'b0;
+ end
+ 
+ 
++always @ (posedge clk or posedge rst)
++begin
++  if (rst)
++    irq_reg <= 8'h00;
++  else 
++    irq_reg <= {bus_error_irq, arbitration_lost_irq, error_passive_irq, 1'b0, data_overrun_irq, error_irq, transmit_irq, receive_irq};
++end
+ 
+-assign irq_reg = {bus_error_irq, arbitration_lost_irq, error_passive_irq, 1'b0, data_overrun_irq, error_irq, transmit_irq, receive_irq};
+ 
+ assign irq = data_overrun_irq | transmit_irq | receive_irq | error_irq | bus_error_irq | arbitration_lost_irq | error_passive_irq;
+ 
+-
+ always @ (posedge clk or posedge rst)
+ begin
+   if (rst)
+     irq_n <= 1'b1;
+-  else if (read_irq_reg || release_buffer)
++  else if (irq_clear_reg)
+     irq_n <=#Tp 1'b1;
+   else if (irq)
+     irq_n <=#Tp 1'b0;
+@@ -1253,4 +1290,3 @@
+ 
+ 
+ endmodule
+-

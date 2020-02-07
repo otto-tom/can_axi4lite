@@ -1,0 +1,11 @@
+--- hw_srcs/original/can_bsp.v	2004-11-22 21:18:03.000000000 +0200
++++ hw_srcs/patched/can_bsp.v	2018-10-31 13:30:25.125466753 +0200
+@@ -1403,7 +1403,7 @@
+   .wr(wr_fifo),
+ 
+   .data_in(data_for_fifo),
+-  .addr(addr[5:0]),
++  .addr(addr[6:0]),
+   .data_out(data_out),
+   .fifo_selected(fifo_selected),
+ 

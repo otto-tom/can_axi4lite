@@ -1,0 +1,24 @@
+--- original/can_acf.v	2005-04-08 16:03:07.000000000 +0300
++++ can_acf.v	2018-10-25 13:42:07.154608159 +0300
+@@ -83,6 +83,9 @@
+ //
+ //
+ //
++// Code Revision 2018/07/31 otto
++// -added support to check id[2:0] in basic mode
++//
+ 
+ // synopsys translate_off
+ `include "timescale.v"
+@@ -170,7 +173,10 @@
+ 
+ 
+ // Working in basic mode. ID match for standard format (11-bit ID).
+-assign match =        ( (id[3]  == acceptance_code_0[0] | acceptance_mask_0[0] ) &
++assign match =        ( (id[0]  == acceptance_code_1[0] | acceptance_mask_1[0] ) &
++                        (id[1]  == acceptance_code_1[1] | acceptance_mask_1[1] ) &
++                        (id[2]  == acceptance_code_1[2] | acceptance_mask_1[2] ) &
++                        (id[3]  == acceptance_code_0[0] | acceptance_mask_0[0] ) &
+                         (id[4]  == acceptance_code_0[1] | acceptance_mask_0[1] ) &
+                         (id[5]  == acceptance_code_0[2] | acceptance_mask_0[2] ) &
+                         (id[6]  == acceptance_code_0[3] | acceptance_mask_0[3] ) &

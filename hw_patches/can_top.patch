@@ -1,0 +1,101 @@
+--- hw_srcs/original/can_top.v	2004-10-25 14:44:47.000000000 +0300
++++ hw_srcs/patched/can_top.v	2018-10-31 13:20:15.185009059 +0200
+@@ -221,8 +221,9 @@
+     wb_cyc_i,
+     wb_stb_i,
+     wb_we_i,
+-    wb_adr_i,
++    wb_addr_i,
+     wb_ack_o,
++    wb_err_o,
+   `else
+     rst_i,
+     ale_i,
+@@ -252,15 +253,16 @@
+ 
+ 
+ `ifdef CAN_WISHBONE_IF
+-  input        wb_clk_i;
+-  input        wb_rst_i;
+-  input  [7:0] wb_dat_i;
+-  output [7:0] wb_dat_o;
+-  input        wb_cyc_i;
+-  input        wb_stb_i;
+-  input        wb_we_i;
+-  input  [7:0] wb_adr_i;
+-  output       wb_ack_o;
++  input         wb_clk_i;
++  input         wb_rst_i;
++  input  [31:0] wb_dat_i;
++  output [31:0] wb_dat_o;
++  input         wb_cyc_i;
++  input         wb_stb_i;
++  input         wb_we_i;
++  input  [7:0]  wb_addr_i;
++  output        wb_ack_o;
++  output        wb_err_o;
+ 
+   reg          wb_ack_o;
+   reg          cs_sync1;
+@@ -273,6 +275,8 @@
+   reg          cs_sync_rst1;
+   reg          cs_sync_rst2;
+   wire         cs_can_i;
++  wire         wb_err_o;
++  
+ `else
+   input        rst_i;
+   input        ale_i;
+@@ -292,7 +296,6 @@
+ output       bus_off_on;
+ output       irq_on;
+ output       clkout_o;
+-
+ // Bist
+ `ifdef CAN_BIST
+ input   mbist_si_i;       // bist scan serial in
+@@ -554,6 +557,7 @@
+   .tx_data_11(tx_data_11),
+   .tx_data_12(tx_data_12)
+   /* End: Tx data registers */
++
+ );
+ 
+ 
+@@ -743,7 +747,7 @@
+ // Multiplexing wb_dat_o from registers and rx fifo
+ always @ (extended_mode or addr or reset_mode)
+ begin
+-  if (extended_mode & (~reset_mode) & ((addr >= 8'd16) && (addr <= 8'd28)) | (~extended_mode) & ((addr >= 8'd20) && (addr <= 8'd29)))
++  if (extended_mode & (~reset_mode) & ((addr >= 8'd64) && (addr <= 8'd112)) | (~extended_mode) & ((addr >= 8'd80) && (addr <= 8'd116)))
+     data_out_fifo_selected = 1'b1;
+   else
+     data_out_fifo_selected = 1'b0;
+@@ -782,7 +786,8 @@
+ `ifdef CAN_WISHBONE_IF
+ 
+   assign cs_can_i = 1'b1;
+-
++  assign wb_err_o = 1'b0;
++  
+   // Combining wb_cyc_i and wb_stb_i signals to cs signal. Than synchronizing to clk_i clock domain. 
+   always @ (posedge clk_i or posedge rst)
+   begin
+@@ -824,11 +829,12 @@
+   end
+ 
+ 
+-  assign rst      = wb_rst_i;
+-  assign we       = wb_we_i;
+-  assign addr     = wb_adr_i;
+-  assign data_in  = wb_dat_i;
+-  assign wb_dat_o = data_out;
++  assign rst       = wb_rst_i;
++  assign we        = wb_we_i;
++  assign addr[6:0] = wb_addr_i[6:0];
++  assign addr[7:7] = 1'b0;
++  assign data_in   = wb_dat_i[7:0];
++  assign wb_dat_o  = {24'h0, data_out};
+ 
+ 
+ `else

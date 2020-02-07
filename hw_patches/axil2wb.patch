@@ -1,0 +1,191 @@
+--- hw_srcs/original/axil2wb.vhd	2018-07-31 15:16:10.516206000 +0300
++++ hw_srcs/patched/axil2wb.vhd	2018-10-31 00:21:04.031348140 +0200
+@@ -40,66 +40,47 @@
+ -- addressing. That is handled by the function a_axi2ipb, which additionally
+ -- zeroes bits not used by the IPbus segment...
+ 
+-
+-
+ library IEEE;
+-use IEEE.STD_LOGIC_1164.all;
+-library work;
++use IEEE.STD_LOGIC_1164.ALL;
+ 
+ entity axil2wb is
+ 
+   generic (
+-    ADRWIDTH  : integer := 15;
++    ADDRWIDTH  : integer := 8;
+     DATAWIDTH : integer := 32);
+-
+   port (
+-    ---------------------------------------------------------------------------
+-    -- AXI Interface
+-    ---------------------------------------------------------------------------
+-    -- Clock and Reset
+     S_AXI_ACLK    : in  std_logic;
+     S_AXI_ARESETN : in  std_logic;
+-    -- Write Address Channel
+-    S_AXI_AWADDR  : in  std_logic_vector(ADRWIDTH-1 downto 0);
++    S_AXI_AWADDR  : in  std_logic_vector(ADDRWIDTH-1 downto 0);
+     S_AXI_AWVALID : in  std_logic;
+     S_AXI_AWREADY : out std_logic;
+-    -- Write Data Channel
+-    S_AXI_WDATA   : in  std_logic_vector(31 downto 0);
+-    S_AXI_WSTRB   : in  std_logic_vector(3 downto 0);
++    S_AXI_WDATA   : in  std_logic_vector(DATAWIDTH-1 downto 0);
++    S_AXI_WSTRB   : in  std_logic_vector((DATAWIDTH/8)-1 downto 0);
+     S_AXI_WVALID  : in  std_logic;
+     S_AXI_WREADY  : out std_logic;
+-    -- Read Address Channel
+-    S_AXI_ARADDR  : in  std_logic_vector(ADRWIDTH-1 downto 0);
++    S_AXI_ARADDR  : in  std_logic_vector(ADDRWIDTH-1 downto 0);
+     S_AXI_ARVALID : in  std_logic;
+     S_AXI_ARREADY : out std_logic;
+-    -- Read Data Channel
+-    S_AXI_RDATA   : out std_logic_vector(31 downto 0);
++--    S_AXI_ARUSER  : in  std_logic_vector(1 downto 0);
++    S_AXI_RDATA   : out std_logic_vector(DATAWIDTH-1 downto 0);
+     S_AXI_RRESP   : out std_logic_vector(1 downto 0);
+     S_AXI_RVALID  : out std_logic;
+     S_AXI_RREADY  : in  std_logic;
+-    -- Write Response Channel
++--    S_AXI_RLAST   : out std_logic;
+     S_AXI_BRESP   : out std_logic_vector(1 downto 0);
+     S_AXI_BVALID  : out std_logic;
+     S_AXI_BREADY  : in  std_logic;
+-    -- AWPROT and ARPROT - required by Altera
+-    --S_AXI_ARPROT  : in  std_logic_vector(2 downto 0);
+-    --S_AXI_AWPROT  : in  std_logic_vector(2 downto 0);
+-    -- Here we have the WB ports
+-    -- The clock and reset are comming from AXI!
++   
+     wb_clk_o      : out std_logic;
+     wb_rst_o      : out std_logic;
+-    -- master_ipb_out - flattened due to Vivado inability to handle user types
+-    -- in BD
+-    wb_addr_o     : out std_logic_vector(31 downto 0);
+-    wb_dat_o      : out std_logic_vector(31 downto 0);
++    wb_addr_o     : out std_logic_vector(ADDRWIDTH-1 downto 0);
++    wb_dat_o      : out std_logic_vector(DATAWIDTH-1 downto 0);
+     wb_we_o       : out std_logic;
+-    wb_sel_o      : out std_logic_vector(3 downto 0);
++    --wb_sel_o      : out std_logic_vector(3 downto 0);
+     wb_stb_o      : out std_logic;
+     wb_cyc_o      : out std_logic;
+-    -- master_ipb_in -  flattened due to Vivado inability to handle user types
+-    -- in BD
+-    wb_dat_i      : in  std_logic_vector(31 downto 0);
+-    wb_err_i      : in  std_logic;  -- Not used in figure 1-2 in specification!
++    wb_dat_i      : in  std_logic_vector(DATAWIDTH-1 downto 0);
++    wb_err_i      : in  std_logic;
+     wb_ack_i      : in  std_logic
+     );
+ 
+@@ -107,33 +88,23 @@
+ 
+ architecture beh of axil2wb is
+ 
+-  function a_axi2wb (
+-    constant axi_addr : std_logic_vector(ADRWIDTH-1 downto 0))
+-    return std_logic_vector is
+-    variable wb_addr : std_logic_vector(31 downto 0);
+-  begin  -- function a_axi2wb
+-    wb_addr                      := (others => '0');
+-    -- Divide the address by 4 (we use word addresses, not the byte addresses)
+-    wb_addr(ADRWIDTH-3 downto 0) := axi_addr(ADRWIDTH-1 downto 2);
+-    return wb_addr;
+-  end function a_axi2wb;
+-
+   signal read_wait, read_wait_in, write_wait, write_wait_in : boolean                                := false;
+-  signal rdata, rdata_in, addr, addr_in, wdata, wdata_in    : std_logic_vector(DATAWIDTH-1 downto 0) := (others => '0');
++  signal rdata, rdata_in, wdata, wdata_in                   : std_logic_vector(DATAWIDTH-1 downto 0) := (others => '0');
++  signal addr, addr_in                                      : std_logic_vector(ADDRWIDTH-1 downto 0) := (others => '0');
+   signal bresp, rresp, bresp_in, rresp_in                   : std_logic_vector(1 downto 0)           := "00";
+   signal del_bresp, del_rresp, del_bresp_in, del_rresp_in   : boolean                                := false;
+ 
+-begin  -- architecture beh
++begin
+ 
+   wb_clk_o <= S_AXI_ACLK;
+-  wb_rst_o <= S_AXI_ARESETN;
+-  wb_sel_o <= (others => '1');          -- We support only whole word accesses
+-
+-  qq : process (S_AXI_ARADDR, S_AXI_ARVALID, S_AXI_AWADDR, S_AXI_AWVALID,
++  wb_rst_o <= not S_AXI_ARESETN;
++  --wb_sel_o <= (others => '1');          -- We support only whole word accesses
++ 
++  qq : process (S_AXI_ARVALID, S_AXI_AWADDR, S_AXI_AWVALID, S_AXI_ARADDR,
+                 S_AXI_BREADY, S_AXI_RREADY, S_AXI_WDATA, S_AXI_WSTRB,
+                 S_AXI_WVALID, addr, bresp, del_bresp, del_rresp, rdata,
+                 read_wait, rresp, wb_ack_i, wb_dat_i, wb_err_i, wdata,
+-                write_wait) is
++                write_wait, S_AXI_ACLK) is
+     variable is_read, is_write : boolean := false;
+   begin  -- process qq
+     -- Defaults
+@@ -159,7 +130,7 @@
+     S_AXI_BRESP   <= (others => '0');
+     S_AXI_ARREADY <= '0';
+     S_AXI_RVALID  <= '0';
+-    S_AXI_RDATA   <= (others => '0');
++    --S_AXI_RDATA   <= (others => '0');
+     S_AXI_RRESP   <= (others => '0');
+     S_AXI_AWREADY <= '0';
+     S_AXI_WREADY  <= '0';
+@@ -187,36 +158,20 @@
+     end if;
+     -- Set the IPbus signals
+     if is_write then
+-      -- Check if this is a new transmission
++    -- Check if this is a new transmission
+       if S_AXI_AWVALID = '1' and S_AXI_WVALID = '1' and write_wait = false then
+-        -- This is a new transmission
+-        -- Check if this is a correct 32-bit write
+-        if S_AXI_WSTRB /= "1111" then
+-          -- Erroneouos write. If slave is ready to accept status, inform about it
+-          S_AXI_AWREADY <= '1';
+-          S_AXI_WREADY  <= '1';
+-          S_AXI_BRESP   <= "10";
+-          S_AXI_BVALID  <= '1';
+-          if S_AXI_BREADY = '0' then
+-            -- Prepare delayed response
+-            bresp_in     <= "10";
+-            del_bresp_in <= true;
+-          end if;
+-        else
+-          -- Correct write
+-          -- Write transaction on IPbus
+-          wb_addr_o     <= a_axi2wb(S_AXI_AWADDR);
++         
++          wb_addr_o     <= S_AXI_AWADDR;
+           wb_dat_o      <= S_AXI_WDATA;
+           wb_stb_o      <= '1';
+           wb_cyc_o      <= '1';
+           wb_we_o       <= '1';
+           -- Store data for the next cycles
+-          addr_in       <= a_axi2wb(S_AXI_AWADDR);
++          addr_in       <= S_AXI_AWADDR;
+           wdata_in      <= S_AXI_WDATA;
+           S_AXI_AWREADY <= '1';
+           S_AXI_WREADY  <= '1';
+           write_wait_in <= true;
+-        end if;
+       else
+         -- This the next cycle of the write transmission
+         wb_addr_o <= addr;
+@@ -245,11 +200,12 @@
+           del_bresp_in <= true;
+         end if;
+       end if;
++
+     elsif is_read then
+       -- Read transaction on IPbus
+       if S_AXI_ARVALID = '1' and read_wait = false then
+-        addr_in       <= a_axi2wb(S_AXI_ARADDR);
+-        wb_addr_o     <= a_axi2wb(S_AXI_ARADDR);
++        addr_in       <= S_AXI_ARADDR;
++        wb_addr_o     <= S_AXI_ARADDR;
+         S_AXI_ARREADY <= '1';
+         -- Remember that we are in read
+         read_wait_in  <= true;
