@@ -12,7 +12,7 @@ Document's sections structure:
 
 This project provides information and resources, in terms of hardware (synthesizable HDL code), software (C code) and documentation that enable the evaluation and testing of CAN-bus controllers operation and communication. Development boards equipped with FPGA and/or micro-controller and/or processor, which provides communicataion links between them, are suitable for porting this project. The provided sources have been tested over development boards equipped 32-bit ARM processors/micro-controllers, i.e., Zedboard (Xilinx Zynq-7000 + Cortex-A9) and SEcube (Lattice MachXO2 + Cortex-M4).  
 
-This work was partially funded by [TAPPS](http://www.tapps-project.eu/) Horizon2020 framework EU-funded project, [ISCA-lab](http://isca.hmu.gr/), colleagues and me, in order to fulfill project's and lab's goals. Demo videos related to [TAPPS](http://www.tapps-project.eu/), with additional H/W and S/W extentions based on the requirements, can be found at [ISCA-lab](http://isca.hmu.gr/)'s [Youtube channel](https://www.youtube.com/channel/UCrP1FrI0Lc0TXkrVJ9Qgu0w/videos).
+This work was partially funded by [TAPPS](http://www.tapps-project.eu/) Horizon2020 framework EU-funded project, [ISCA-lab](http://isca.hmu.gr/), colleagues and me, in order to fulfill project's and lab's goals. Demo videos related to [TAPPS](http://www.tapps-project.eu/), with additional H/W and S/W extensions based on the requirements, can be found at [ISCA-lab](http://isca.hmu.gr/)'s [Youtube channel](https://www.youtube.com/channel/UCrP1FrI0Lc0TXkrVJ9Qgu0w/videos).
 
 [![tapps_demo_thumb](https://img.youtube.com/vi/-rwaL6bnDQk/0.jpg)](https://www.youtube.com/watch?v=-rwaL6bnDQk "Secure FOTA update - Click to Watch!")
 
