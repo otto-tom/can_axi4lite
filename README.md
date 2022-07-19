@@ -1,6 +1,6 @@
 # CAN-bus Controller with AXI4-lite Interface
 
-Document's sections structure:  
+README structure:  
 [Overview](#overview)  
 [Publications](#publications)  
 [Design Information](#design-information)  
@@ -68,21 +68,19 @@ Expected waveform (only CAN bus & IRQs)
 
 **_BAUD rate formula_**
 
-<p align="center"> <img align="center" src="https://latex.codecogs.com/png.latex?%5Cdpi%7B120%7D%20Baud%5C%20Rate%3D%5Cfrac%7B1%7D%7B%28BPR*clk%5C_period%29*%281&plus;TSEG1&plus;TSEG2%29%29%7D"> </p>
-
 <!---
-$$
-Baud\ Rate=\frac{1}{(BPR*clk\_period)*(1+TSEG1+TSEG2))}
-$$
+<p align="center"> <img align="center" src="https://latex.codecogs.com/png.latex?%5Cdpi%7B120%7D%20Baud%5C%20Rate%3D%5Cfrac%7B1%7D%7B%28BPR*clk%5C_period%29*%281&plus;TSEG1&plus;TSEG2%29%29%7D"> </p>
 --->
+
+$$
+Baud\ Rate=\frac{1}{(BPR\*clk\\_period)\*(1+TSEG1+TSEG2))}
+$$
 
 **_NOTE 0_**
 
 > BRP (Baud Rate Prescaler), TSEG1 (Time SEGment), TSEG2 and SJW (Synchronization Jump Width)are the final values that CAN controller's Bit Time Logic uses, not the ones set through the API. The following list gives the mapping from the API given to the actual value that HW perceives:
-> <p align="center"> <img src="https://latex.codecogs.com/png.latex?%5Cdpi%7B120%7D%20%5Cbegin%7Baligned%7D%20BRP%20%26%5Cmapsto%202*%28BRP&plus;1%29%20%5C%5C%20TSEG1%20%26%5Cmapsto%20TSEG1&plus;1%20%5C%5C%20TSEG2%20%26%5Cmapsto%20TSEG2&plus;1%20%5C%5C%20SJW%20%26%5Cmapsto%20SJW&plus;1%20%5Cend%7Baligned%7D"> </p>
-
-<!---
-$$
+>
+> $$
 \begin{aligned} 
 BRP &\mapsto 2*(BRP+1) \\
 TSEG1 &\mapsto TSEG1+1 \\
@@ -90,6 +88,9 @@ TSEG2 &\mapsto TSEG2+1 \\
 SJW &\mapsto SJW+1
 \end{aligned}
 $$
+
+<!---
+<p align="center"> <img src="https://latex.codecogs.com/png.latex?%5Cdpi%7B120%7D%20%5Cbegin%7Baligned%7D%20BRP%20%26%5Cmapsto%202*%28BRP&plus;1%29%20%5C%5C%20TSEG1%20%26%5Cmapsto%20TSEG1&plus;1%20%5C%5C%20TSEG2%20%26%5Cmapsto%20TSEG2&plus;1%20%5C%5C%20SJW%20%26%5Cmapsto%20SJW&plus;1%20%5Cend%7Baligned%7D"> </p>
 --->
 
 **_NOTE 1_**
@@ -132,13 +133,17 @@ The provided, under the _sw/_ folder, software gives the ability to a programmer
 **_NOTE 2_**  
 
 >Some of the functionality that the example code provides, i.e. CAN-2A/CAN-2B, POLL/INTERRUPT modes, can be selected at compile time; this can be achieved either by modifying _[ISCA_CAN_CFG.h](src/include/ISCA_CAN_CFG.h)_ or by passing to the compiler the appropriate options, e.g., _gcc ... -DCAN_MODE=1_. There follows all the available options.
-> <p align="center">  <img src="https://latex.codecogs.com/png.latex?%5Cdpi%7B120%7D%20%5Cfn_cm%20%5Csmall%20CAN%5C_MODE%20%5Cin%20%5C%7B0%2C1%5C%7D%2C%20where%5C%200%5Cmapsto%5C%20basic%2C%5C%201%5Cmapsto%5C%20extended"> </p>
+>
+>$$ 
+\begin{aligned}
+CAN\\_MODE &\in {0,1},\ where\ 0\mapsto\ basic,\ 1\mapsto extended \\
+APPRISE\\_MODE &\in {0,1},\ where\ 0\mapsto\ Polling\ Mode,\ 1\mapsto\ Interrupt\ Mode 
+\end{aligned}
+$$
+
+
+<!--<p align="center">  <img src="https://latex.codecogs.com/png.latex?%5Cdpi%7B120%7D%20%5Cfn_cm%20%5Csmall%20CAN%5C_MODE%20%5Cin%20%5C%7B0%2C1%5C%7D%2C%20where%5C%200%5Cmapsto%5C%20basic%2C%5C%201%5Cmapsto%5C%20extended"> </p>
 > <p align="center">  <img src="https://latex.codecogs.com/png.latex?%5Cdpi%7B120%7D%20%5Cfn_cm%20%5Csmall%20APPRISE%5C_MODE%20%5Cin%20%5C%7B0%2C1%5C%7D%2C%20where%5C%200%5Cmapsto%5C%20Polling%5C%20Mode%2C%5C%201%5Cmapsto%5C%20Interrupt%5C%20Mode"> </p>
-
-<!--
->* \(CAN\_MODE \in \{0,1\}, where\ 0\mapsto\ basic,\ 1\mapsto\ extended\)
-
->* \(APPRISE\_MODE \in \{0,1\}, where\ 0\mapsto\ Polling\ Mode,\ 1\mapsto\ Interrupt\ Mode\)
 --->
 
 For more detailed information about the provided software, file dependencies etc. you are encouraged to modify to your needs or taste and compile the provided [Doxygen file](drax/doc/SW/Doxyfile) and gain access to the provided software's  documentation (installation of [Doxygen](http://www.stack.nl/~dimitri/doxygen/download.html) is required. Tested over version 1.8.13). A pre-compiled version based on the [Doxygen file](drax/doc/Doxyfile) HTML output exists zipped under `drax/doc/SW/`; [ISCA_CAN_CFG.h](sw/include/ISCA_CAN_CFG.h) definitions during compilation were the same as the current ones. Extract [drax/doc/SW/html.zip](drax/doc/SW/html.zip) and open _html/index.html_ with your web browser; guide yourself through the code documentation.  
