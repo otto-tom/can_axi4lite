@@ -114,7 +114,7 @@ typedef struct can_controller_s {
 	uint8_t q_size;       /*!<RX queue size in frames*/
 	uint8_t irq;          /*!<IRQ mode, \ref CAN_IRQ_ON or \ref CAN_IRQ_OFF*/
 	irq_en  irqs_en; ;    /*!<IRQs enable union*/
-	void (*InterruptCallback) (void *); /*!<Interupt callback pointer*/
+	void (*InterruptHandler) (void *); /*!<Interupt callback pointer*/
 } can_ctrl_s;
 #else
 /// CAN controller IRQ enable union
