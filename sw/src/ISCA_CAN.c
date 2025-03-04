@@ -155,7 +155,8 @@
  * A read request to the CAN clear IRQ register clears the interrupt
  * at the CAN controller
  * */
-#define CAN_IRQ_CLEAR         (CAN_IRQ_CLEAR_BASE_ADDRESS+4U)
+//Defined at ISCA_CAN_IRQ.c
+//#define CAN_IRQ_CLEAR         (CAN_BASE_ADDRESS+4U)
 
 /**
  * @brief CAN command TX register (Write-Only)
